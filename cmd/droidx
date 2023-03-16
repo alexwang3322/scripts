@@ -1,0 +1,209 @@
+#!/bin/bash
+
+HISTFILE=~/.bash_history
+set -o history
+
+LIGHT='\033[0;33m'
+NC='\033[0m'
+SCRIPT="droidx"
+
+function package() {
+    adb shell dumpsys window windows | grep -E 'mCurrentFocus' | awk -F " " '{split($3, a, "\/")}; {print a[1]};'
+    finnaly package
+}
+
+function urldecode() { : "${*//+/ }"; echo -e "${_//%/\\x}"; }
+
+function draw() {
+    adb shell setprop debug.hwui.overdraw $1
+    finnaly draw
+}
+
+function input() {
+    if [ $# != 0 ]; then
+        adb shell input text $1
+    fi
+    finnaly input
+}
+
+function last() {
+    # droid last xxx 1
+    if [ $# != 0 ]; then
+        history | grep "${1}" | grep -v "droid" | grep -v "history" | awk '{print $4, $5, $6, $7, $8, $9, $10, $11, $12}' | uniq | tail -n 2 | head -n ${2}
+    else
+        # grep "${1}" ~/.bash_history | tail -n 2 | head -n 1
+        history | tail -n 2 | head -n 1   
+    fi        
+    finnaly last
+}
+
+function clear() {
+    adb shell pm clear $1
+    finnaly clear
+}
+
+function version() {
+    echo 'Android version' `adb shell getprop ro.build.version.release`
+    echo 'SDK version' `adb shell getprop ro.build.version.sdk`
+    finnaly version
+}
+
+function record() {
+    adb shell screenrecord /sdcard/Movies/$1
+    finnaly record
+}
+
+function recordpull() {
+    adb pull /sdcard/Movies/$1 ./
+    finnaly recordpull
+}
+
+function dex() {
+    if [ $# = 0 ];
+    then
+        echo -e "${LIGHT}$ droidx dex ./classes.dex <package>${NC}"
+        echo "  Show all class and signature about the <package>"
+        echo -e "${LIGHT}$ droidx dex ./classes.dex <package> <type>${NC}"
+        echo "  Show all type about the <package>"
+        echo "Type include: c, m, cm; c is class, m is method, cm is classes and methods"
+        exit 1
+    fi
+    dexfile=$1
+    packageName=$2
+    if [ $# -gt 2 ]; 
+    then
+        if [ "$3" == "m" ];
+        then
+            dexdump -h $1 | grep -e "Class descriptor .*$2"  -B 14 | grep direct_methods_size | awk '{s+=$3} END {print "methods: " s}' 
+        elif [ "$3" == "c" ]; 
+        then
+            dexdump -h $1 | grep -e "Class descriptor .*$2"  -B 14 | grep $2 | wc -l | awk '{print "classes: " $1}'
+        elif [ "$3" == "cm" ]; 
+        then
+            dexdump -h $1 | grep -e "Class descriptor .*$2"  -B 14 | grep $2 | wc -l | awk '{print "classes: " $1}'
+            dexdump -h $1 | grep -e "Class descriptor .*$2"  -B 14 | grep direct_methods_size | awk '{s+=$3} END {print "methods: " s}'         
+        fi            
+    else
+        dexdump -h $1 | grep -e "Class descriptor .*$2"  -B 14
+    fi
+}
+
+function emulate() {
+    echo -e "${LIGHT}adb root${NC}\n"
+    emulator -avd `emulator -list-avds | head -n 1` -writable-system
+}
+
+function shot() {
+    adb exec-out screencap -p > $1
+    finnaly shot
+}
+
+function a() {
+    adb shell dumpsys window windows | grep -E 'mObscuringWindow=Window'
+    #adb shell dumpsys window windows | grep -E 'mCurrentFocus' | awk -F "\/" '{split($2, a, "}")}; {print a[1]};' 
+    #adb shell dumpsys activity top | grep "ACTIVITY" | awk -F " " '{print $2}' | tail -n 1
+    #finnaly activity
+}
+
+function f() {
+    adb shell dumpsys activity top | grep "Active Fragments" -A 10 | tail -n 10 | grep "$1" | head -n 1 | tr -d " "
+    finnaly fragment
+}
+
+function ui() {
+    finnaly ui
+    uiautomatorviewer
+}
+
+function ip() {
+    ifconfig | grep -E "inet " | grep -v 127.0.0.1 | head -n 1 | awk '{print $2}'
+    finnaly ip
+}
+
+function start() {
+    URL_DECODE=`urldecode $1`
+    URL=`echo $URL_DECODE | awk -F "?" '{print $1}'`
+    PARAMS=`echo $URL_DECODE | awk -F "?" '{print "--es \"" $2 "\"" }' | sed -e "s/&/\" --es \"/g" | sed -e "s/=/\" \"/g"`
+    echo "\\n"
+    echo $PARAMS
+    echo $URL
+    echo "\\n"
+    adb shell am start --es "biz" "train" $PARAMS -a android.intent.action.VIEW -d "${URL}"
+    finnaly
+}
+
+function finnaly() {
+    d=$(date +'%m/%d/%Y')
+    cmd=$1
+    echo "${d},${cmd}" >> ~/bin/.droidx_data
+    #d2=$(date +'%Y-%m-%d,%H:%M:%S')
+    #curl http://140.143.136.115/tools_stat_api?cmd=droidx\&param=${cmd}
+}
+
+function stat() {
+    open http://140.143.136.115/tools_stat_txt
+}
+
+function help() {
+
+echo -e "Android command line help
+USAGE: 
+    # Android SDK is MUST
+    curl https://github.com/../${SCRIPT} > ~/bin/${SCRIPT}
+    chmod a+x ~/bin/${SCRIPT}
+
+DESCRIPTION:
+    $ ${LIGHT}${SCRIPT} <instructions>${NC} # [instructions] including following symbols:
+        ${LIGHT}a [stack|bundle]${NC}
+            # display current activity package and name
+        ${LIGHT}f [mArguments]${NC}
+            # display current fragment package and name
+        ${LIGHT}start <URL>${NC}
+            # start Android the deep link activity
+            # detail see: https://developers.google.com/assistant/app/get-started#identify_app_functionality
+        ${LIGHT}package${NC}                       
+            # show the application package name
+        ${LIGHT}dec${NC}                       
+            # decompile apk, using Apkanalyizer 
+            $ ${SCRIPT} dec
+        ${LIGHT}clear <packageName>${NC}       
+            # clear cache of the app
+            $ ${SCRIPT} clear com.sample
+        ${LIGHT}ui${NC}                        
+            # start Uiautomatorviewer
+            $ ${SCRIPT} ui
+        ${LIGHT}shot <dst.png>${NC}            
+            # take a snap shot picture on current screen
+            $ ${SCRIPT} shot demo.png
+        ${LIGHT}record <dst.mp4>${NC}          
+            # record screen 
+            $ ${SCRIPT} record demo.mp4
+        ${LIGHT}draw <show | off>${NC}         
+            # switch system OverDraw setting OFF or SHOW
+            $ ${SCRIPT} draw show
+        ${LIGHT}version${NC}                  
+            # show device version something
+            $ ${SCRIPT} version
+        ${LIGHT}find <msg>${NC} 
+            $ ${SCRIPT} find R.id.abc # must calling in .git/ same level folder
+        ${LIGHT}input <msg>${NC} 
+            $ ${SCRIPT} input msg
+        ${LIGHT}ip <msg>${NC} 
+            $ ${SCRIPT} ip
+        ${LIGHT}last <msg>${NC} 
+            $ ${SCRIPT} last xxx.sh
+        ${LIGHT}dex <classes.dex>${NC} 
+            $ ${SCRIPT} droidx dex ./classes.dex <package>
+        ${LIGHT}emulate${NC} 
+            # start first emulate in -writable-system, and you will exe $ adb root
+            $ ${SCRIPT} droidx emulate
+        ${LIGHT}stat${NC} 
+            # open stat web page 
+" | more -R
+}
+
+if [ $# == 0 ]; then
+    help
+fi
+
+$1 $2 $3 $4 $5 $6 $7 $8 $9 

@@ -1,0 +1,188 @@
+#!/usr/local/bin/python3
+
+import sys
+import operator
+import re
+import os
+import collections
+import time
+from datetime import datetime, timedelta
+#import matplotlib.pyplot as plt
+#import matplotlib.ticker as ticker
+
+start = 0.0
+end = 0.0
+
+def _start():
+    global start
+    start = time.time()
+
+def _end():
+    global end
+    end = time.time()
+    print("#cost #match :", round(end-start, 2), "second")
+
+
+def filereader(filename, reverse=False):
+    source = open(filename)
+    slist = source.readlines()
+    if reverse:
+        slist.reverse()
+    return slist
+
+
+def handle_date2(line):
+    t = line.replace("#", "")
+    localtime = time.localtime(int(t))
+    month = time.strftime("%m", localtime)
+    day = time.strftime("%d", localtime)
+    hour = time.strftime("%H", localtime)
+    return int(month), int(day), int(hour)
+
+
+def match(filelines, maxitem=1000, filterkey=None, scope=0):
+    i = 0
+    cmds = {}
+    
+    now = None 
+    before = None
+    
+    if scope == 0:
+        now = datetime.now()
+        before = now
+    else:    
+        now = datetime.now()
+        before = now + timedelta(days=scope)
+        maxitem = sys.maxsize
+
+    maxday = now.day
+    minday = before.day
+    maxmonth = now.month
+    minmonth = before.month
+
+
+    for line in filelines:
+        if "workx" in line:
+            continue
+
+        if line.startswith("#"):
+            month, day, hour = handle_date2(line)
+            if (maxday < day and maxmonth < month) or (minday > day and minmonth > month):
+                break
+        else:
+            if filterkey is not None and filterkey not in line:
+                continue
+
+            line = line.replace("\n", "").rstrip()
+            line = line[:9] # limit the line length
+            # 统计
+            if line not in cmds:
+                cmds[line] = 1
+            else:
+                cmds[line] = cmds[line] + 1     
+        i += 1
+        if i > maxitem:
+            break
+            
+    sorted_cmds = sorted(cmds.items(), key=lambda x: x[1])
+    return sorted_cmds           
+
+def getCmdsInDay(lines, key, scope):
+    pass
+
+def pie(cmds):
+    pass
+
+def hist(cmds, maxitem=-10):
+    start = time.time()
+
+    xy = cmds[maxitem: ]
+    x, y = zip(*xy) # unpack a list of pairs into two tuples
+    plt.bar(x, y)
+
+    end = time.time()
+    print("#cost #plot  :", round(end-start, 2), "second")
+    plt.show()
+
+
+def line(cmds):
+    x = range(25)
+    y = [0 for i in x]
+    for line in cmds:
+        if line.startswith("#"):
+            month, day, hour = handle_date2(line)
+            y[hour] = y[hour] + 1
+
+    plt.subplots(2)
+    ax1 = plt.subplot(2,1,1)
+    plt.bar(x, y)
+    ax1.xaxis.set_major_locator(ticker.MultipleLocator(1))
+    # ticker.MultipleLocator(1) 显示刻度周的数量，设置为5，每5个显示一次
+
+    ax2 = plt.subplot(2,1,2)
+    plt.plot(x, y, color='k', label='Sine')
+    ax2.xaxis.set_major_locator(ticker.MultipleLocator(1))
+    
+    now = datetime.now()
+    plt.show()
+    # plt.savefig("~/Documents/cmdas/" + str(now.month) + "_" + str(now.day) + ".png")
+
+
+def main(option):
+    msg = "Work effencience analysis\n"
+    msg += "Sample:\n"
+    msg += "today\n"
+    msg += "    $ workx -plot=hist -day=0 -key=git\n"
+    msg += "    $ workx -plot=hist -key=git\n"
+    msg += "    $ workx -plot=line -key=git\n"
+    msg += "last 3 days\n"
+    msg += "    $ sudo workx -plot=hist -s=-3 -key=git\n"
+    print(msg)
+
+    '''
+    new api:
+    workx 
+        day=[last day, defalut is today] 
+        plot=[hist|line|pie]
+            hist: histgram by each command
+            line: from 00:00 - 24:00
+            pie:  from 00:00 - 24:00
+        key=[keychar in history, default is all]
+        store=[true|false] default is false
+            store in remote data machine
+    
+    example:
+    1. workx day=0 plot=pie key=git
+    2. workx day=-7 plot=pie
+    2. workx day=-7 plot=pie
+    '''
+    
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-plot', type=str, default='None', help="plot type: line, seq, hist")
+    parser.add_argument('-day', type=int, default=0, help="time scope in day[-, 0]")
+    parser.add_argument('-key', type=str, default=None, help="key word filter")
+    parser.add_argument('-max', type=int, default=-10, help="max limit of show")
+    option = parser.parse_args()
+
+    all_cmds = filereader("~/.bash_history", reverse=True)
+    spec_cmds = getCmdsInDay(all_cmds, key=option.key, scope=option.day)
+    print(spec_cmds)
+    plot = option.plot
+    if plot == 'line':
+        line(spec_cmds)
+    elif plot == 'pie':
+        pie(spec_cmds)
+    elif plot == 'hist':
+        hist(spec_cmds, maxitem=option.max)
+    elif plot == 'all':
+        pass # combining pie and hist         
+    else:
+        #print(cmds[option.l:])
+        print("directly print data")
+
+
+if __name__ == "__main__":
+    #main()
+    main()
+

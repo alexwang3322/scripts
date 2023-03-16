@@ -1,0 +1,32 @@
+#!/bin/bash
+
+# Env Variables
+JAVA_HOME=/Applications/Android\ Studio.app/Contents/jbr/Contents/Home
+ANDROID_HOME=~/Library/Android/sdk
+ANDROID_NDK=~/Library/Android/sdk/ndk/25.2.9519653/
+#CLOUD=
+
+# Shortcuts
+git config --global pager.branch false  # After used git branch without this configration, the Esc will show like 'less' command.
+git config --global alias.co checkout
+git config --global alias.br branch
+git config --global alias.ci commit
+git config --global alias.st status
+git config --global alias.ad add
+git config --global alias.last 'log -1 HEAD'
+git config --global alias.unstage 'reset HEAD --'
+
+alias doc="cd ~/Documents/"
+alias dek="cd ~/Desktop/"
+alias dld="cd ~/Downloads/"
+
+## Shortcut.Dev
+alias jn="jupyter notebook"
+alias ll="ls -lh"
+
+# Init cmds
+#touch ~/bin/
+#ln -sf ./cmd/* ~/bin/
+
+# Exports
+export PATH="/opt/homebrew/bin:$JAVA_HOME:$ANDROID_HOME/platform-tools/:$ANDROID_NDK:$PATH"

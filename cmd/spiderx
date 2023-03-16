@@ -1,0 +1,16 @@
+#!/bin/bash
+
+
+# run Twitter, Stackoverflow, Git trending spider
+# 查询有个技术的趋势，氛围，分布，时间线
+
+# Twitter 某人的关注分布，发推特的时间和频率，他的时间趋势等
+
+# stackoverflow，某类问题的趋势
+
+# git 仓库的issues增长趋势等，了解技术趋势，仓库管理情况等
+# https://developer.github.com/v3/pulls/review_requests/
+
+
+#### 用Python实现最后做图会很好，但是API请求，数据Parsse这些工作也用Python？
+######## 还是要去网上分析下别人做的，不要一上来就自己做

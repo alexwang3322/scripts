@@ -1,0 +1,159 @@
+#!/bin/bash
+
+LIGHT='\033[0;33m'
+NC='\033[0m'
+fmt='
+    c=%(committerdate:short)
+    rl=%(committerdate:relative)
+    r=%(refname)
+    n=%(authorname)
+    cc=%(contents:subject)
+    us=%(HEAD)
+    
+    t=%(*objecttype)
+    T=${r#refs/tags/}
+
+    o=%(*objectname)
+    e=%(*authoremail)
+    s=%(*subject)
+    d=%(*authordate)
+    b=%(*body)
+    
+    #printf "%s %-40s %-30s %s\n" $c ${r:13} $n ${cc:0:20}
+    if [ $tag = 1 ] 
+    then
+        echo $c ${r:13} $n ${cc:0:20} # local and all 
+    elif [ $tag = 2 ]     
+    then     
+        echo $c $rl                   # remote-summary
+    elif [ $tag = 3 ]     
+    then     
+        echo $n $rl                   # members-summary
+    fi
+    
+'
+
+function local() {
+    echo -e "${LIGHT}local-refs${NC}"
+    eval=`git for-each-ref --shell --format="$fmt" \
+        --sort='*objecttype' \
+        --sort=-committerdate \
+        refs/heads`
+    tag=1
+    eval "$eval"
+    tag=2
+    echo -e "${LIGHT}local-summary${NC}"
+    eval "$eval" | wc -l | awk '{print "remote-branches ", $0}'
+    eval "$eval" | grep "year" | wc -l | awk '{print "over-years      ", $0}'
+    eval "$eval" | grep -v "year" | grep "month" | wc -l | awk '{print "over-months     ", $0}'
+    eval "$eval" | grep -v "year" | grep -v "month" | grep "week" | wc -l | awk '{print "over-weeks      ", $0}'
+}
+
+function remote() {
+    eval=`git for-each-ref --shell --format="$fmt" \
+        --sort='*objecttype' \
+        --sort=-committerdate \
+        refs/remotes`
+    tag=1
+    eval "$eval"
+}
+
+function remote_summary_impl() {
+    eval=`git $1 $2 for-each-ref --shell --format="$fmt" \
+            --sort='*objecttype' \
+            --sort=-committerdate \
+            refs/remotes`
+    tag=2
+
+    if [ $# -ge 3 ]
+    then
+        echo -n $3,
+        remote=$(eval "$eval" | wc -l)
+        years=$(eval "$eval" | grep "year" | wc -l)
+        months=$(eval "$eval" | grep -v "year" | grep "month" | wc -l)
+        weeks=$(eval "$eval" | grep -v "year" | grep -v "month" | grep "week" | wc -l)
+        echo ${remote}, ${months}, ${weeks}
+    else
+        echo -e "${LIGHT}remote-summary${NC}"
+        eval "$eval" | wc -l | awk '{print "remote-branches ", $0}'
+        eval "$eval" | grep "year" | wc -l | awk '{print "over-years      ", $0}'
+        eval "$eval" | grep -v "year" | grep "month" | wc -l | awk '{print "over-months     ", $0}'
+        eval "$eval" | grep -v "year" | grep -v "month" | grep "week" | wc -l | awk '{print "over-weeks      ", $0}'
+    fi
+    
+}
+
+function member_summary_impl() {
+    eval=`git $1 $2 for-each-ref --shell --format="$fmt" \
+        --sort='*objecttype' \
+        --sort=-committerdate \
+        refs/remotes`
+    tag=3
+    echo -e "${LIGHT}members-summary${NC}"
+    eval "$eval" | awk '{print $1}' | sort | uniq -c | sort | nl
+}
+
+function summary_impl() {
+    if [ $# -ge 2 ]
+    then
+        if [ $2 = "--plot" ]
+        then
+            echo "class,years,months,weeks"
+            for var in "${@:3}"
+            do  
+                $1 --git-dir ${var}/.git ${var}
+            done
+        else
+            for var in "${@:2}"
+            do  
+                echo -e "${LIGHT}${var}${NC}"
+                $1 --git-dir ${var}/.git
+            done
+        fi            
+    else
+        $1
+    fi
+}
+
+function summary() {
+    summary_impl remote_summary_impl $@
+    summary_impl member_summary_impl $@
+}
+
+function remote_summary() {
+    summary_impl remote_summary_impl $@
+}
+
+function member_summary() {
+    summary_impl member_summary_impl $@
+}
+
+function log() {
+    # --since '7 days ago' --branches 
+    pwd | awk -F "\/" '{print $(NF)}'
+    git log $1 --oneline --pretty=format:"%C(yellow)%h%C(reset) %s by %C(cyan)%an%C(reset) - %ar"
+}
+
+function find() {
+    if [ $# != 0 ]; then
+        git grep --color -e $1 --full-name
+    fi
+}
+
+if [ -z $1 ]
+then
+    echo "Git command line help"
+    echo -e "${LIGHT}Commands:${NC}"
+    echo -e "gits log                                 ${LIGHT} # print 'git-repo' log with one line formate data${NC}"
+    echo -e "gits local  [git-repo..]                 ${LIGHT} # print 'git-repo' or 'folders' local refs${NC}"
+    echo -e "gits remote [git-repo..]                 ${LIGHT} # print 'git-repo' or 'folders' remote and branch data, same as git log all${NC}"
+    echo -e "gits summary [--plot] [git-repo..]                ${LIGHT} # print 'git-repo' remote and member summary data${NC}"
+    echo -e "gits remote_summary [--plot] [git-repo..]         ${LIGHT} # print 'git-repo' summary data${NC}"
+    echo -e "gits member_summary [--plot] [git-repo..]         ${LIGHT} # print 'git-repo' member data${NC}"
+    echo -e "UNDO gits clear <time> <user> [git-repo..]        ${LIGHT} # clear 'git-repo' refs after <time> or specific user${NC}"
+    echo -e "${LIGHT}Examples:${NC}"
+    echo "$ gits remote_summary train/ bus/"
+    echo "$ gits remote_summary plot train/ bus/"
+fi
+
+$@

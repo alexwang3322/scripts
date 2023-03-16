@@ -1,0 +1,164 @@
+#!/usr/local/bin/python3
+
+import argparse
+import requests
+import os.path
+from bs4 import BeautifulSoup
+from urllib.parse import urlparse, parse_qs
+from os import listdir
+from os.path import isfile, join
+
+
+BASE = "http://top.zhan.com"
+READ = BASE + "/toefl/read/start.html"
+parsed_detail_urls = []  
+
+
+def list_page_spider():
+    readlist = "http://top.zhan.com/toefl/read/alltpo"
+    start = 4
+    end = 49
+    step = 4
+    urls = []
+    detailurls = []
+    for i in range(start, end, step):
+        url = readlist + str(i) + ".html"
+        urls.append(url)
+
+    for url in urls:
+        r = requests.get(url)
+        soup = BeautifulSoup(r.text, 'html.parser')
+        details = soup.find_all('a', href=True)
+        for d in details:
+            detailurl = str(d["href"])
+            if detailurl.startswith(READ):
+                detailurls.append(detailurl)
+                detail_page_spider(detailurl)
+    return detailurls
+
+
+def detail_page_spider(url):
+    if url in parsed_detail_urls:
+        return 
+    
+    parsed_detail_urls.append(url)
+    r = requests.get(url)
+    soup = BeautifulSoup(r.text, 'html.parser')
+    titleDiv = soup.find_all(name='div', attrs={"class":"title"}) 
+    detailsDiv = soup.find_all(name='div', attrs={"class":"article"}) # bs4.element.ResultSet
+    
+    title = titleDiv[1].get_text()
+    article = detailsDiv[0].get_text()
+
+    o = urlparse(url)
+    query = o.query
+    article_id = parse_qs(query)['article_id'][0]
+    
+    filename = "./" + str(article_id) + "_" + str(title)
+    if not isfile(filename):
+        print(filename)
+        f = open(filename, 'w+')
+        f.write(article)
+        f.close()
+
+
+txt_format_line = "".join(["-" for i in range(20)])
+
+def legible_print(content, top=True, bottom=True):
+    if top:
+        print(txt_format_line)
+    if type(content) == list:
+      for c in content:
+          print(c) 
+    else:          
+        print(content)
+    if bottom:
+        print(txt_format_line)
+
+
+def split_dir(dirname, option):
+    files = [f for f in listdir(dirname) if isfile(join(dirname, f))]
+    count = 0
+    for filename in files:
+        if count >= option.dc:
+            break
+        split_single_file(dirname + filename, option)
+        count = count + 1
+
+def split_single_file(filename, option):
+    text = open(filename)
+    splited = text.read().split()
+    def txtfilter(txt):
+        return txt.isalpha()
+    newsplited = filter(txtfilter, splited)
+    newsplited_list = list(newsplited)
+    handlewords(newsplited_list, filename, option)
+
+def split(option):
+    filename = option.f
+    if os.path.isdir(filename):
+        split_dir(filename, option)
+    else:
+        split_single_file(filename, option)      
+    
+def stat(rawwords, filename, isprint=True, desc="desc"):
+    # merge the same word but different in upper case and lower case
+    rawwords = [x.lower() for x in rawwords]
+
+    # merge the same word but being used as adjactive or adv.
+    # ....
+
+    uniqwords = set(rawwords)
+    legible_print([filename, 
+                "raw words have  " + str(len(rawwords)), 
+                "uniq words have " + str(len(uniqwords)), 
+                ""], bottom=False)
+    stats = [(u, rawwords.count(u)) for u in uniqwords]
+    stats.sort(key = lambda count : count[1]) # sort by second of tuple in list 
+    if desc == "desc": # desc order
+        stats.reverse() 
+    return stats
+
+
+def grep(words, condition):
+    def word_filter(word_count):
+        return option.g in word_count[0]
+    grepwords = list(filter(word_filter, words))
+    if len(grepwords) > 3:
+        legible_print("grep words have " + str(len(grepwords)), top=False)
+    return grepwords
+
+
+def handlewords(splited, filename, filenameoption):
+    words = stat(splited, filename, desc=option.o)
+    if option.g is not None:
+        words = grep(words, option.g)
+    print(*words[:option.c], sep='\n')
+
+
+def tofel(dir='~/Library/Mobile Documents/com~apple~CloudDocs/Mine/programs/English/articles'):
+    articles = [f for f in listdir(dir) if isfile(join(dir, f))]
+    
+
+def main(option):
+    if option.f is not None:
+        splited = split(option)
+    elif option.u is not None:
+        splited = list_page_spider()
+    elif option.t is not None:
+        tofel()                
+    
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-f', type=str, default=None, help="The text file name or dirctory")
+    parser.add_argument('-u', type=str, default=None, help="yes is parsing text from website")
+    parser.add_argument('-dc', type=int, default=500, help="The number of showing files, default is 500")
+    parser.add_argument('-c', type=int, default=20, help="The number of showing words, default is 20")
+    parser.add_argument('-o', type=str, default='desc', help="The order of words list, asc or desc, default is desc")
+    parser.add_argument('-g', type=str, default=None, help="Grep the word of the words list, default is None")
+    option = parser.parse_args()
+    if option.f is None and option.u is None:
+        parser.print_help()
+    else:        
+        main(option)    

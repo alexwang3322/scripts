@@ -1,0 +1,182 @@
+#!/usr/local/bin/python3
+
+import collections
+import os
+
+class Clazz:
+
+    def __init__(self, root_dir, root_package, clazz_package_name):
+        self.imports = []
+        self.exclude = ['com.**.**.singlelist.']
+        self.root_dir = root_dir
+        self.root_package = root_package
+        if clazz_package_name[-1] == ";":
+            self.clazz_package_name = clazz_package_name[0:-1]
+        else:
+            self.clazz_package_name = clazz_package_name
+
+    def walk(self, classMap):
+        resovled = self.resolve()
+        if not resovled:
+            return
+
+        if len(self.imports) == 0:
+            return
+
+        for clazz in self.imports:
+            if not clazz.clazz_package_name in classMap:
+                classMap[clazz.clazz_package_name] = 1
+                clazz.walk(classMap)
+            else:
+                classMap[clazz.clazz_package_name] += 1
+
+
+    def isExcluded(self, line):
+        for e in self.exclude:
+            if line.startswith("import " + e):
+                return True
+        return False
+
+    def isImport(self, line):
+        if not line.startswith("import static"):
+            if line.startswith("import " + self.root_package):
+                package = line.strip().split(" ")[1]
+                if not package.endswith(".R;"):
+                    return True
+        return False
+
+    def resolve(self):
+        full_path = self.clazz_package_name.replace(".", "/")
+        full_path = self.root_dir + full_path + ".java"
+        try:
+            clazzFile = open(full_path)
+            for line in clazzFile.readlines():
+                if self.isExcluded(line):
+                    continue
+                if self.isImport(line):
+                    package = line.strip().split(" ")[1]
+                    clazz = Clazz(self.root_dir, self.root_package, package)
+                    self.imports.append(clazz)
+        except FileNotFoundError:
+            return False
+        return True
+
+class Resource:
+    def __init__(self):
+        self.imports = []
+        self.name = ""
+
+    def wallk(self):
+        pass
+
+    def resolve(self):
+        return []
+
+class Workload:
+    '''
+    Workload
+        - root package relative dir
+        - root class package name
+        - base package name
+        - needed refactor package name
+   '''
+    def __init__(self, relative_dir, root_package, clazz_package_name, refactor_package):
+        self.relative_dir = relative_dir
+        self.rootClass = Clazz(relative_dir, root_package, clazz_package_name)
+        self.refactor_package = refactor_package
+        self.extraClassMap = {} # (signature, count)
+        self.excludeClassMap = [] # [signature]
+
+    def walk(self):
+        self.rootClass.walk(self.extraClassMap)
+
+    def data(self):
+        classCount = 0
+        classFrequence = 0
+        refactorClassCount = 0
+        refactorClassFrequence = 0
+        self.extraClassMap = collections.OrderedDict(sorted(self.extraClassMap.items()))
+        for packageName in self.extraClassMap:
+            classCount += 1
+            classFrequence += self.extraClassMap[packageName]
+            if packageName.startswith(self.refactor_package):
+               refactorClassCount += 1
+               refactorClassFrequence += self.extraClassMap[packageName]
+
+            print(packageName, self.extraClassMap[packageName])
+
+        import pandas as pd
+        data = {
+            'location': [self.relative_dir[-20:-1]],
+            'spec-imports': [refactorClassCount],
+            'spec-imports-type': [refactorClassFrequence],
+            'all-imports': [classCount],
+            'all-imports-type': [classFrequence],
+            }
+        df= pd.DataFrame(data)
+        print(df)
+
+def test1(path, root_package, package):
+    clazz = Clazz(path, root_package, package)
+    print(clazz.resolve())
+
+
+def lines(rootDir):    
+    def file_len(fname):
+        total = 0
+        non_blank_count = 0
+        with open(fname) as f:
+            for line in f:
+                if line.strip():
+                    non_blank_count += 1
+                total += 1                
+        return total, non_blank_count
+
+    count = 0
+    total = 0
+    non_blank = 0
+    for dirName, subdirList, fileList in os.walk(rootDir):
+        for f in fileList:
+            if ".java" in f:
+                count += 1
+                (file_lines, file_non_blank) = file_len(dirName + "/" + f)
+                non_blank += file_non_blank
+                total += file_lines
+    print("file count : ", count)
+    print("file lines : ", total)
+    print("average lines     : %.3f"% (total / float(count)))
+    print("non blank lines   :", non_blank)
+    print("blank lines ratio : {0:.3}".format((total - non_blank) / total))
+
+
+def main():
+    import argparse
+    desc = "path=~/Documents/programs/fliggy_android/flight/ui/src \
+            root_package=com.**. \
+            root_class_package=com.**.**.singlelist.FlightListActivity \
+            refactor_package=com.**.**"
+
+    parser = argparse.ArgumentParser(description=desc)
+    parser.add_argument('path', type=str,
+                help="搜索范围的目录 ~/Documents/programs/fliggy_android/flight/ui/src")
+    parser.add_argument('root_package', type=str,
+                help="搜索范围的基础 com.**.")
+    parser.add_argument('root_class_package',  type=str,
+                help="以该类为起点 com.**.**.singlelist.FlightListActivity")
+    parser.add_argument('refactor_package',  type=str, 
+                help="特定的包名搜索范围 com.**.**")
+    option = parser.parse_args()
+
+    '''
+    A Class dependence resolve analysis for measuring function refactor workload.
+    '''
+    wordload = Workload(option.path,
+                        option.root_package, 
+                        option.root_class_package, 
+                        option.refactor_package)
+    wordload.walk()
+    wordload.data()
+
+if __name__ == "__main__":
+    main()
+    

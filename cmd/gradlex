@@ -1,0 +1,64 @@
+#!/bin/bash
+
+LIGHT='\033[0;33m'
+NC='\033[0m'
+
+function dependencies() {
+    MODULE=$1
+    if [ $# -gt 2 ]; 
+    then
+        if [ "$3" == "short" ];
+        then
+            ./gradlew $MODULE:dependencies --configuration $2 | grep "\-\-\- "
+            ./gradlew $MODULE:dependencies --configuration $2 | grep "\-\-\- " | wc -l
+        elif [ "$3" == "locate" ];
+        then
+            ./gradlew $MODULE:dependencies --configuration $2 | grep "\-\-\- " \
+            | grep $4 \
+            | awk '{print $2}' \
+            | awk -F ":" '{print "~/.gradle/caches/modules-2/files-2.1/" $1 "/" $2 "/" $3}'
+        elif [ "$3" == "batch_loc" ]; 
+        then 
+            ./gradlew $MODULE:dependencies --configuration $2 | grep "\-\-\- " | while read line
+            do
+                echo $line | awk '{print $2}' | awk -F ":" '{print "~/.gradle/caches/modules-2/files-2.1/" $1 "/" $2 "/" $3 "/"}'
+            done
+        fi
+    elif [ $# -gt 1 ]; 
+    then
+        ./gradlew $MODULE:dependencies --configuration $2
+    elif [ $# -gt 0 ];
+    then
+        ./gradlew $MODULE:dependencies | grep -e "--" -B 1 | grep -n " - " \
+        | awk -F "-" '{print $1}' \
+        | awk -F ":" '{printf "%5s %s\n", $1, $2}'
+    fi
+}
+
+function d() {
+    dependencies $1 $2 $3 $4
+}
+
+function help() {
+    echo -e "${LIGHT}Example:${NC}
+    ${LIGHT}$ ${SCRIPT} 1. gradlex dependencies :bus:bus ${NC}
+        N compileProject
+        N provided
+        N providedCompile
+    ${LIGHT}$ ${SCRIPT} 2. gradlex dependencies :bus:bus compileProject${NC}
+        all at compileProject package
+    ${LIGHT}$ ${SCRIPT} 3. gradlex dependencies :bus:bus compileProject short|locate [commonbusiness]|batch_loc${NC}
+        # short: show dependencies only
+        # locate: file path of spec bundle
+        # batch_loc: files path of all dependecies
+    ${LIGHT}$ ${SCRIPT} 4. gradlex dependencies :bus:bus grep android.arch.lifecycle:runtime ${NC}
+        compileProject 1
+        provided 1
+        providedCompile 1"
+}
+
+if [ $# == 0 ]; then
+    help
+fi
+
+$1 $2 $3 $4 $5

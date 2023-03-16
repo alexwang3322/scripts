@@ -1,0 +1,100 @@
+#!/bin/bash
+
+function jni() {
+# code generation
+    # source file
+    BASE=~/bin/cmd/scaffold_scripts/jni
+    FILE=${BASE}/Template_JNI.cpp
+    FILEMK_ANDROID=${BASE}/Android.mk
+    FILEMK_APPLICATION=${BASE}/Application.mk
+    mkdir jni
+    mkdir include
+    METHOD=$1 # method name
+    TARGET=$2
+
+    sed "s/%METHOD/$METHOD/" $FILE > jni/${TARGET}.cpp
+    sed "s/%MODULE_NAME/$TARGET/" $FILEMK_ANDROID > jni/Android.mk
+    sed -e "s/%SRC_FILE/${TARGET}.cpp/g" -i "" jni/Android.mk
+    cp $FILEMK_APPLICATION jni/Application.mk
+
+# compling file
+    echo "path=`pwd`" > build.sh
+    echo "ndk-build -C . NDK_PROJECT_PATH=\${path}" >> build.sh
+    chmod +x build.sh
+    sh build.sh
+
+# push & run
+    echo "adb push ./libs/arm64-v8a/${TARGET} /data/local/tmp/" > run.sh
+    echo 'adb shell "cd /data/local/tmp/ && chmod 777 ./${TARGET} && ./${TARGET}"' >> run.sh    
+}
+
+function dex_jni() {
+    echo "java_jni"
+    # package.name.java
+    # import native.so    
+}
+
+# Example: scaffold dex Test
+function dex() {   
+# define env     
+    CLASS=$1   # "Test"
+    PACKAGE=$2 # "com.company.test"    
+    
+    TAGET_JAVA="${CLASS}.java"
+    TAGET_CLASS="${CLASS}.class"
+    TAGET_DEX="${CLASS}.dex"
+
+# code generation
+    # source file
+        # package , class name
+        # batch
+    FILE=~/bin/cmd/scaffold_scripts/Template.java
+    if [ -z "$PACKAGE" ];
+    then
+        echo "none.."
+        FILE=~/bin/cmd/scaffold_scripts/Template2.java
+    fi
+        
+    sed "s/%PACKAGE/$PACKAGE/" $FILE > ${TAGET_JAVA}      
+    sed -e "s/%CLASS/$CLASS/g" -i "" ${TAGET_JAVA}
+
+# make file
+    # javac 
+    # dx     
+    javac ${TAGET_JAVA}
+    
+    # or d8 --output=foo.dex TAGET_CLASS
+    dx --dex --output=${TAGET_DEX} ${TAGET_CLASS}
+
+    adb push ${TAGET_DEX} /data/local/tmp/${TAGET_DEX}
+    adb shell dalvikvm -cp /data/local/tmp/${TAGET_DEX} ${CLASS}
+}
+
+function native_cpp() {
+    DST=$1
+    FILE=~/bin/cmd/scaffold_scripts/Template.cpp
+    
+    cp $FILE $DST.cpp
+    echo "g++ $DST.cpp -o $DST.out" > build.sh
+    echo "./$DST.out" >> build.sh
+    sh build.sh
+
+    # cmake file
+    
+    # compling file        
+    # exe
+        # g++ $target -o ans.out
+        # ./ans.out #3124
+    
+    # lib
+        # g++ -c $target -o ans.a
+        # ar rvs ans.a ans.o
+        # g++ main.cpp ans.a -o lib.out
+}
+
+echo "
+    # jni METHOD TARGET
+    # dex CLASS PACKAGE
+    # native_cpp DST
+"
+$@
