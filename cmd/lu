@@ -1,0 +1,118 @@
+#!/bin/zsh
+
+function println() {
+    RED='\033[01;31m'
+    GREEN='\033[01;32m'
+    YELLOW='\033[01;33m'
+    BLUE='\033[01;34m'
+    NONE='\033[0m'
+    echo "$1" | awk -v y=$YELLOW -v n=$NONE -F '/' '{print "\n>>>>> " y$(NF-1)n}'
+}
+
+function branch() {
+    for dir in `find $APPS -name ".git" | awk -F '.' '{print $1}'`; do
+        cd $dir
+        println $dir    
+        git branch    
+    done
+}
+
+function checkout() {
+    for dir in `find $APPS -name ".git" | awk -F '.' '{print $1}'`; do
+        cd $dir
+        println $dir
+        git checkout -b $1 $2
+    done
+}
+
+function switch() {
+    for dir in `find $APPS -name ".git" | awk -F '.' '{print $1}'`; do
+        cd $dir
+        println $dir        
+        git checkout $1
+    done
+}
+
+function status() {
+    for dir in `find $APPS -name ".git" | awk -F '.' '{print $1}'`; do
+        cd $dir        
+        println $dir       
+        git status        
+    done
+}
+
+function pull() {
+    for dir in `find $APPS -name ".git" | awk -F '.' '{print $1}'`; do
+        cd $dir
+        println $dir       
+        git pull        
+    done
+}
+
+function fetch() {
+    for dir in `find $APPS -name ".git" | awk -F '.' '{print $1}'`; do
+        cd $dir
+        println $dir       
+        git fetch        
+    done
+}
+
+function log() {
+    git log --pretty=format:"%x09%ad%x09%s%x09%an"
+}
+
+function extensions() {
+    cd $APPS
+    find ./ -type f | awk -F '.' '{print $3}' | grep -v '/'| grep -v 'git' | grep -v '[0-9]' | sort | uniq
+}
+
+function shot() {
+    adb shell dumpsys SurfaceFlinger --display-id 
+    adb exec-out screencap -d 14030544112329034 -p > $APPS/data/$1.png
+    open $APPS/data/
+    open $APPS/data/$1.png
+}
+
+function conn() {
+    sudo ifconfig vlan1 create
+    sudo ifconfig vlan1 vlan 1 vlandev en5
+    sudo ifconfig vlan1 192.168.1.99
+    #adb kill-server
+    adb connect 192.168.1.12
+    adb devices
+    adb shell
+}
+
+function dist() {
+    #git log --pretty=format:"%h%x09%an%x09%ad%x09%s" --since="1 month ago"
+    git log --pretty=format:"%ad" --since="2 month ago" | awk '{print $4}' | awk -F ':' '{print $1}' | sort | uniq -c | awk '{print $2 "h, " $1}' > $APPS/data/dist.txt    
+    cat $APPS/data/dist.txt
+    git log --pretty=format:"%ad" --since="2 month ago" | awk '{print $4}' | awk -F ':' '{print $1}' | sort | wc -l | awk '{print "Total " $1}'
+}
+
+function help() {
+    echo ">>>>>>HELP>>>>>>
+Git:
+    init [branchName]
+    fetch
+    pull
+    branch
+    status
+    switch [branchName]
+    checkout [localName] [remoteName]
+    log
+Data:
+    dist
+Test:
+    shot [photoName]
+    conn
+<<<<<<HELP<<<<<<
+"
+}
+
+if [ $# -eq 0 ]
+then
+    help
+fi
+
+$@
