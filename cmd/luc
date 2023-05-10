@@ -43,6 +43,16 @@ function conn() {
     adb devices
 }
 
+function signal() {
+    echo $1 $2
+    adb shell dumpsys activity service com.android.car inject-vhal-event $1 $2
+}
+
+function signalerr() {
+    echo $1 $2
+    adb shell dumpsys activity service com.android.car inject-error-event $1 $2 $3
+}
+
 function help() {
     echo ">>>>>>HELP>>>>>>
 Git:
@@ -112,6 +122,10 @@ Test:
         To take a screen shot from CID screen, and save as [photoName].png in your computer
     conn
         This is an encapsulation of adb commands connecting to CCCv1 or CCCv2.
+    signal
+        lu signal 0x2140160F 1
+    signalerr
+        lu signalerr 0x2140160F 2 3
 <<<<<<HELP<<<<<<
 ```
 
