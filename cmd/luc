@@ -1,0 +1,121 @@
+#!/bin/zsh
+
+GIT_CMDS=("branch"  "br"  "checkout"  "co"  "status" "st"  "pull"  "fetch"  "remote"  "diff"  "stash"  "log")
+CWD=`pwd`
+
+function println() {
+    RED='\033[01;31m'
+    GREEN='\033[01;32m'
+    YELLOW='\033[01;33m'
+    BLUE='\033[01;34m'
+    NONE='\033[0m'
+    echo "$1" | awk -v class="${1}" y=$YELLOW -v n=$NONE -F '/' '{print "\n>>>>> " y$(NF-1)n}'
+}
+
+function gitcmd() {
+    echo $CWD
+    for dir in `find $CWD -name ".git" | awk -F '.' '{print $1}'`; do
+        cd $dir
+        println $dir
+        git $@
+    done
+}
+
+function shot() {
+    adb shell dumpsys SurfaceFlinger --display-id
+    if [[ -z $APPS ]]
+    then
+        adb exec-out screencap -d 14030544112329034 -p > $CWD/$1.png
+        open $CWD/$1.png
+    else
+        adb exec-out screencap -d 14030544112329034 -p > $APPS/data/shots/$1.png
+        open $APPS/data/shots/
+        open $APPS/data/shots/$1.png
+    fi
+}
+
+function conn() {
+    sudo ifconfig vlan1 create
+    sudo ifconfig vlan1 vlan 1 vlandev en5
+    sudo ifconfig vlan1 192.168.1.99
+    #adb kill-server
+    adb connect 192.168.1.12
+    adb devices
+}
+
+function help() {
+    echo ">>>>>>HELP>>>>>>
+Git:
+    fetch, pull, branch (br), status (st), checkout (co), remote, diff, stash, log.
+        Eg. # luc branch -v 
+            will list all local branches of every $APP git repositories on your terminal.
+Test:
+    shot [photoName]
+        To take a screen shot from CID screen, and save as [photoName].png in your computer
+    conn
+        This is an encapsulation of adb commands connecting to CCCv1 or CCCv2.
+<<<<<<HELP<<<<<<
+"
+}
+
+for cmd in ${GIT_CMDS[*]}; do
+    if [ "$cmd" = "$1" ]; then        
+        gitcmd $@
+        exit
+    fi
+done
+
+if [ $# -eq 0 ]
+then
+    help
+fi
+
+$@
+
+----- README.md -----
+This is a simple script tool like Google [REPO](https://gerrit.googlesource.com/git-repo). If you feel struggle to use multiple Git projects at the same time on terminal, you can try this. 
+
+For example, you are on ~/../apps/ directory which contains several git projects, and you can use '$luc branch -v' exactly like 
+'$git branch -v' on terminal to show branches information on all git repos under this folder ~/../apps/. Or you can try to use '$ luc status', '$ luc fetch', '$ luc checkout CT' and etc.
+
+Because the output of this script is to standard output, it can be cooperated with [piplines](https://www.gnu.org/software/bash/manual/html_node/Pipelines.html). For example, I can use
+
+```shell
+~/../apps $ luc st | grep "\-lib" -A 10
+```
+to list all changes from these projects for me:
+```shell
+>>>>> luc-i18n-lib
+>>>>> luc-cloud-lib
+>>>>> luc-settings-lib
+...
+```
+
+### Install
+``` sh
+$ mkdir -p ~/.bin
+$ PATH="${HOME}/.bin:${PATH}"
+$ curl https://**/scripts/-/raw/master/luc > ~/.bin/luc
+$ chmod a+rx ~/.bin/luc
+```
+
+### Usage
+```shell
+~/../apps $ luc
+>>>>>>HELP>>>>>>
+Git:
+    fetch, pull, branch (br), status (st), checkout (co), remote, diff, stash, log.
+        Eg. # luc branch -v 
+            will list all local branches of every $APP git repositories on your terminal.
+Test:
+    shot [photoName]
+        To take a screen shot from CID screen, and save as [photoName].png in your computer
+    conn
+        This is an encapsulation of adb commands connecting to CCCv1 or CCCv2.
+<<<<<<HELP<<<<<<
+```
+
+
+
+
+
